@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mijozlar va qarzlar</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --ink:#1c1a24;
+    --ink-soft:#67637a;
+    --paper:#f7f6fb;
+    --card:#ffffff;
+    --line:#e2e0ee;
+    --line-strong:#c7c3dc;
+    --blue:#3a55c9;
+    --blue-dark:#28409e;
+    --blue-tint:#e3e8fa;
+    --green:#2f7a4a;
+    --green-tint:#dcefe0;
+    --red:#b3382c;
+    --red-tint:#fbe3e0;
+    --radius:10px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);}
+  .wrap{max-width:640px;margin:0 auto;padding:18px 16px 64px;}
+  header h1{font-size:21px;font-weight:700;margin:0 0 4px;}
+  header p{font-size:13.5px;color:var(--ink-soft);margin:0;line-height:1.5;}
+
+  .not-telegram{
+    background:var(--red-tint);color:var(--red);border-radius:var(--radius);
+    padding:12px 14px;font-size:13.5px;margin-bottom:16px;display:none;line-height:1.5;
+  }
+
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0;}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;}
+  .stat .label{font-size:12px;color:var(--ink-soft);margin-bottom:4px;}
+  .stat .val{font-size:18px;font-weight:700;}
+  .stat.warn .val{color:var(--red);}
+
+  .today-btn{
+    width:100%;padding:12px;border-radius:var(--radius);border:1.5px solid var(--blue);
+    background:var(--blue-tint);color:var(--blue-dark);font-size:14.5px;font-weight:600;cursor:pointer;margin-bottom:14px;
+  }
+
+  .search-row{display:flex;gap:8px;margin:0 0 10px;}
+  .search-row input{
+    flex:1;padding:11px 14px;border:1.5px solid var(--line-strong);border-radius:var(--radius);
+    font-size:15px;background:var(--card);color:var(--ink);
+  }
+  .search-row input:focus{outline:none;border-color:var(--blue);}
+  .add-btn{
+    background:var(--blue);color:#fff;border:none;border-radius:var(--radius);
+    padding:0 18px;font-size:20px;font-weight:600;cursor:pointer;line-height:1;
+  }
+  .add-btn:active{background:var(--blue-dark);}
+
+  .count-line{font-size:12.5px;color:var(--ink-soft);margin-bottom:10px;}
+
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:13px 15px;margin-bottom:10px;
+  }
+  .card.overdue{border-color:var(--red);border-width:1.5px;}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .card .name{font-size:16px;font-weight:700;margin:0 0 2px;}
+  .card .sub{font-size:12.5px;color:var(--ink-soft);}
+  .card .debt{font-size:17px;font-weight:700;text-align:right;white-space:nowrap;}
+  .card .debt.zero{color:var(--green);}
+  .card .debt.pos{color:var(--red);}
+  .overdue-tag{
+    display:inline-block;margin-top:6px;font-size:12px;font-weight:600;color:var(--red);
+    background:var(--red-tint);padding:2px 8px;border-radius:6px;
+  }
+  .card-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+  .card-actions button{
+    flex:1;min-width:90px;padding:9px 10px;border-radius:8px;border:1.5px solid var(--line-strong);
+    background:var(--card);font-size:13.5px;font-weight:600;cursor:pointer;color:var(--ink);
+  }
+  .card-actions button.msg{border-color:var(--red);color:var(--red);background:var(--red-tint);}
+  .card-actions button.hist{color:var(--ink-soft);}
+
+  .history{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;display:none;}
+  .history.open{display:block;}
+  .history-item{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;}
+  .history-item .t{color:var(--ink-soft);}
+  .history-item .a.purchase{color:var(--red);}
+  .history-item .a.payment{color:var(--green);}
+  .history-empty{font-size:13px;color:var(--ink-soft);}
+
+  .empty{text-align:center;padding:40px 20px;color:var(--ink-soft);font-size:14px;}
+  .empty .big{font-size:30px;margin-bottom:8px;}
+
+  .overlay{
+    display:none;position:fixed;inset:0;background:rgba(20,18,30,.4);
+    align-items:flex-end;justify-content:center;z-index:10;
+  }
+  .overlay.open{display:flex;}
+  .sheet{
+    background:var(--paper);width:100%;max-width:640px;border-radius:16px 16px 0 0;
+    padding:20px 18px 24px;max-height:85vh;overflow-y:auto;
+  }
+  .sheet h2{font-size:17px;margin:0 0 14px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12.5px;color:var(--ink-soft);margin-bottom:6px;font-weight:600;}
+  .field input{
+    width:100%;padding:10px 12px;border:1.5px solid var(--line-strong);border-radius:8px;
+    font-size:15px;font-family:inherit;background:var(--card);color:var(--ink);
+  }
+  .field input:focus{outline:none;border-color:var(--blue);}
+  .err{color:var(--red);font-size:12.5px;margin-top:4px;display:none;}
+  .sheet-actions{display:flex;gap:10px;margin-top:16px;}
+  .sheet-actions button{flex:1;padding:12px;border-radius:8px;font-size:15px;font-weight:600;border:none;cursor:pointer;}
+  .btn-cancel{background:var(--card);color:var(--ink);border:1.5px solid var(--line-strong) !important;}
+  .btn-save{background:var(--blue);color:#fff;}
+  .btn-save:active{background:var(--blue-dark);}
+
+  .today-list h3{font-size:13.5px;color:var(--ink-soft);margin:14px 0 8px;}
+  .today-list h3:first-child{margin-top:0;}
+  .today-row{display:flex;justify-content:space-between;font-size:14px;padding:7px 0;border-bottom:1px solid var(--line);}
+  .today-row:last-child{border-bottom:none;}
+  .today-row .amt.purchase{color:var(--red);font-weight:600;}
+  .today-row .amt.payment{color:var(--green);font-weight:600;}
+  .today-empty{font-size:13.5px;color:var(--ink-soft);text-align:center;padding:20px 0;}
+
+  .status{font-size:12px;color:var(--ink-soft);text-align:center;margin-top:18px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Mijozlar va qarzlar</h1>
+    <p>Har bir mijozning qarzi, to'lovi va tovar olgani shu yerda. 15 kundan beri to'lov qilmagan mijozlar qizil rangda ko'rinadi.</p>
+  </header>
+
+  <div class="not-telegram" id="notTelegram">
+    Bu sahifa Telegram ilovasi ichida ochilganda ma'lumotni Telegram xotirasida saqlaydi. Hozir brauzerda ochilgani uchun ma'lumot vaqtinchalik bo'ladi — botdagi "Open app" tugmasi orqali oching.
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="label">Jami qarzdorlik</div><div class="val" id="statTotalDebt">0</div></div>
+    <div class="stat warn"><div class="label">Muddati o'tganlar</div><div class="val" id="statOverdue">0</div></div>
+  </div>
+
+  <button class="today-btn" id="openToday">Bugungi jarayon</button>
+
+  <div class="search-row">
+    <input type="text" id="search" placeholder="Mijoz ismini qidiring...">
+    <button class="add-btn" id="openAddClient" aria-label="Yangi mijoz">+</button>
+  </div>
+
+  <div class="count-line" id="countLine"></div>
+  <div id="list"></div>
+</div>
+
+<div class="overlay" id="overlayClient">
+  <div class="sheet">
+    <h2>Yangi mijoz qo'shish</h2>
+    <div class="field">
+      <label>Ism *</label>
+      <input type="text" id="fName" placeholder="Mijoz ismi">
+      <div class="err" id="errName">Ismni kiriting</div>
+    </div>
+    <div class="field">
+      <label>Telefon (ixtiyoriy, WhatsApp xabar uchun)</label>
+      <input type="tel" id="fPhone" placeholder="+998901234567">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-cancel" id="cancelClient">Bekor qilish</button>
+      <button class="btn-save" id="saveClient">Saqlash</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlayTx">
+  <div class="sheet">
+    <h2 id="txTitle">Amal qo'shish</h2>
+    <div class="field">
+      <label>Summa (so'm) *</label>
+      <input type="number" id="fAmount" placeholder="Masalan: 150000">
+      <div class="err" id="errAmount">Summani kiriting</div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-cancel" id="cancelTx">Bekor qilish</button>
+      <button class="btn-save" id="saveTx">Saqlash</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlayToday">
+  <div class="sheet">
+    <h2>Bugungi jarayon</h2>
+    <div class="today-list" id="todayList"></div>
+    <div class="sheet-actions">
+      <button class="btn-cancel" id="closeToday">Yopish</button>
+    </div>
+  </div>
+</div>
+
+<div class="status" id="status"></div>
+
+<script>
+const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+if(tg){
+  tg.ready();
+  tg.expand();
+}else{
+  document.getElementById('notTelegram').style.display = 'block';
+}
+
+/* ---------- Cloud storage layer (falls back to localStorage outside Telegram) ---------- */
+function csSet(key, value){
+  return new Promise((resolve, reject)=>{
+    if(tg){
+      tg.CloudStorage.setItem(key, value, (err, ok)=> err ? reject(err) : resolve(ok));
+    }else{
+      try{ localStorage.setItem(key, value); resolve(true); }catch(e){ reject(e); }
+    }
+  });
+}
+function csGetItems(keys){
+  return new Promise((resolve, reject)=>{
+    if(keys.length===0){ resolve({}); return; }
+    if(tg){
+      tg.CloudStorage.getItems(keys, (err, values)=> err ? reject(err) : resolve(values||{}));
+    }else{
+      const out = {};
+      keys.forEach(k=> out[k] = localStorage.getItem(k) || '');
+      resolve(out);
+    }
+  });
+}
+function csGetItem(key){
+  return new Promise((resolve, reject)=>{
+    if(tg){
+      tg.CloudStorage.getItem(key, (err, value)=> err ? reject(err) : resolve(value||''));
+    }else{
+      resolve(localStorage.getItem(key) || '');
+    }
+  });
+}
+function csRemove(key){
+  return new Promise((resolve, reject)=>{
+    if(tg){
+      tg.CloudStorage.removeItem(key, (err, ok)=> err ? reject(err) : resolve(ok));
+    }else{
+      localStorage.removeItem(key); resolve(true);
+    }
+  });
+}
+
+/* ---------- App data ---------- */
+let clients = [];       // {id, name, phone, createdAt}
+let txByClient = {};    // clientId -> [{type, amount, date, ts}]
+let currentTxClientId = null;
+let currentTxType = null;
+
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmt(n){
+  return Math.round(n).toLocaleString('fr-FR').replace(/,/g,' ') + " so'm";
+}
+function todayStr(){
+  return new Date().toISOString().slice(0,10);
+}
+function daysBetween(d1, d2){
+  return Math.floor((new Date(d2) - new Date(d1)) / 86400000);
+}
+
+async function loadData(){
+  const statusEl = document.getElementById('status');
+  try{
+    const idxRaw = await csGetItem('idx');
+    const ids = idxRaw ? JSON.parse(idxRaw) : [];
+    if(ids.length===0){ clients = []; txByClient = {}; render(); return; }
+
+    const keys = [];
+    ids.forEach(id=>{ keys.push('c_'+id); keys.push('tx_'+id); });
+    const values = await csGetItems(keys);
+
+    clients = [];
+    txByClient = {};
+    ids.forEach(id=>{
+      const cRaw = values['c_'+id];
+      const tRaw = values['tx_'+id];
+      if(cRaw){ clients.push(JSON.parse(cRaw)); }
+      txByClient[id] = tRaw ? JSON.parse(tRaw) : [];
+    });
+  }catch(e){
+    statusEl.textContent = "Ma'lumotni yuklashda xatolik yuz berdi.";
+    clients = []; txByClient = {};
+  }
+  render();
+}
+
+async function saveIndex(){
+  await csSet('idx', JSON.stringify(clients.map(c=>c.id)));
+}
+async function saveClientRecord(client){
+  await csSet('c_'+client.id, JSON.stringify(client));
+}
+async function saveClientTx(clientId){
+  const statusEl = document.getElementById('status');
+  try{
+    await csSet('tx_'+clientId, JSON.stringify(txByClient[clientId] || []));
+  }catch(e){
+    statusEl.textContent = "Tarix hajmi chegaraga yetdi — eski yozuvlarni arxivlash kerak bo'lishi mumkin.";
+  }
+}
+
+function clientDebt(clientId){
+  return (txByClient[clientId]||[]).reduce((sum,t)=> sum + (t.type==='purchase' ? t.amount : -t.amount), 0);
+}
+function lastPaymentInfo(clientId){
+  const payments = (txByClient[clientId]||[]).filter(t=>t.type==='payment');
+  if(payments.length===0){
+    const client = clients.find(c=>c.id===clientId);
+    return { date: client ? client.createdAt : todayStr(), never: true };
+  }
+  payments.sort((a,b)=> new Date(b.date) - new Date(a.date));
+  return { date: payments[0].date, never: false };
+}
+function clientHistory(clientId){
+  return (txByClient[clientId]||[]).slice().sort((a,b)=> new Date(b.date)-new Date(a.date));
+}
+
+function renderStats(){
+  const totalDebt = clients.reduce((s,c)=> s + Math.max(0, clientDebt(c.id)), 0);
+  let overdueCount = 0;
+  clients.forEach(c=>{
+    const debt = clientDebt(c.id);
+    const lp = lastPaymentInfo(c.id);
+    if(debt > 0 && daysBetween(lp.date, todayStr()) >= 15) overdueCount++;
+  });
+  document.getElementById('statTotalDebt').textContent = fmt(totalDebt);
+  document.getElementById('statOverdue').textContent = overdueCount;
+}
+
+function render(){
+  renderStats();
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const list = document.getElementById('list');
+  const countLine = document.getElementById('countLine');
+
+  let filtered = clients.filter(c => !q || c.name.toLowerCase().includes(q));
+
+  filtered = filtered.map(c=>{
+    const debt = clientDebt(c.id);
+    const lp = lastPaymentInfo(c.id);
+    const days = daysBetween(lp.date, todayStr());
+    const overdue = debt > 0 && days >= 15;
+    return {...c, debt, lastPaymentDays: days, lastPaymentNever: lp.never, overdue};
+  }).sort((a,b)=>{
+    if(a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+    return b.debt - a.debt;
+  });
+
+  countLine.textContent = clients.length
+    ? (q ? `${filtered.length} ta natija` : `Jami ${clients.length} ta mijoz`)
+    : '';
+
+  if(filtered.length===0){
+    list.innerHTML = `<div class="empty">
+      <div class="big">👥</div>
+      ${clients.length===0
+        ? "Hali mijoz yo'q. + tugmasi orqali birinchi mijozni qo'shing."
+        : "Hech kim topilmadi."}
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(c => `
+    <div class="card ${c.overdue?'overdue':''}" data-id="${c.id}">
+      <div class="card-top">
+        <div>
+          <p class="name">${esc(c.name)}</p>
+          <p class="sub">${c.phone ? esc(c.phone) : 'Telefon kiritilmagan'}</p>
+          ${c.overdue ? `<span class="overdue-tag">${c.lastPaymentNever ? 'Hali to\'lov bo\'lmagan' : c.lastPaymentDays + ' kundan beri to\'lov yo\'q'}</span>` : ''}
+        </div>
+        <div class="debt ${c.debt>0?'pos':'zero'}">${c.debt>0 ? fmt(c.debt) : "Qarzi yo'q"}</div>
+      </div>
+      <div class="card-actions">
+        <button class="purchase-btn" data-id="${c.id}">+ Tovar berildi</button>
+        <button class="payment-btn" data-id="${c.id}">+ Pul qabul qilindi</button>
+        <button class="hist-btn" data-id="${c.id}">Tarix</button>
+        ${c.phone ? `<button class="msg" data-id="${c.id}">Eslatma yuborish</button>` : ''}
+      </div>
+      <div class="history" id="hist-${c.id}"></div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.purchase-btn').forEach(b=> b.addEventListener('click', ()=> openTx(b.dataset.id, 'purchase')));
+  list.querySelectorAll('.payment-btn').forEach(b=> b.addEventListener('click', ()=> openTx(b.dataset.id, 'payment')));
+  list.querySelectorAll('.msg').forEach(b=> b.addEventListener('click', ()=> sendReminder(b.dataset.id)));
+  list.querySelectorAll('.hist-btn').forEach(b=> b.addEventListener('click', ()=> toggleHistory(b.dataset.id)));
+}
+
+function toggleHistory(clientId){
+  const el = document.getElementById('hist-'+clientId);
+  const isOpen = el.classList.contains('open');
+  if(isOpen){ el.classList.remove('open'); return; }
+  const hist = clientHistory(clientId);
+  el.innerHTML = hist.length
+    ? hist.map(t=>`
+      <div class="history-item">
+        <span class="t">${t.date}</span>
+        <span class="a ${t.type}">${t.type==='purchase' ? '+' : '-'} ${fmt(t.amount)}</span>
+      </div>
+    `).join('')
+    : '<div class="history-empty">Hali tranzaksiya yo\'q</div>';
+  el.classList.add('open');
+}
+
+function sendReminder(clientId){
+  const c = clients.find(x=>x.id===clientId);
+  if(!c || !c.phone) return;
+  const debt = clientDebt(clientId);
+  const phone = c.phone.replace(/[^0-9]/g,'');
+  const text = `Assalomu alaykum, ${c.name}. Sizning ${fmt(debt)} qarzingiz bo'yicha to'lov kutib qolmoqdamiz. Iltimos imkon qadar tezroq to'lovni amalga oshirsangiz. Rahmat!`;
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+  if(tg) tg.openLink(url); else window.open(url, '_blank');
+}
+
+document.getElementById('search').addEventListener('input', render);
+
+const overlayClient = document.getElementById('overlayClient');
+document.getElementById('openAddClient').addEventListener('click', ()=>{
+  document.getElementById('fName').value='';
+  document.getElementById('fPhone').value='';
+  document.getElementById('errName').style.display='none';
+  overlayClient.classList.add('open');
+});
+document.getElementById('cancelClient').addEventListener('click', ()=> overlayClient.classList.remove('open'));
+overlayClient.addEventListener('click', e=>{ if(e.target===overlayClient) overlayClient.classList.remove('open'); });
+
+document.getElementById('saveClient').addEventListener('click', async ()=>{
+  const name = document.getElementById('fName').value.trim();
+  const phone = document.getElementById('fPhone').value.trim();
+  if(!name){ document.getElementById('errName').style.display='block'; return; }
+  document.getElementById('errName').style.display='none';
+  const client = {
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2,7),
+    name, phone,
+    createdAt: todayStr()
+  };
+  clients.push(client);
+  txByClient[client.id] = [];
+  overlayClient.classList.remove('open');
+  render();
+  await saveClientRecord(client);
+  await saveIndex();
+});
+
+const overlayTx = document.getElementById('overlayTx');
+function openTx(clientId, type){
+  currentTxClientId = clientId;
+  currentTxType = type;
+  document.getElementById('txTitle').textContent = type==='purchase' ? "Tovar berildi" : "Pul qabul qilindi";
+  document.getElementById('fAmount').value='';
+  document.getElementById('errAmount').style.display='none';
+  overlayTx.classList.add('open');
+}
+document.getElementById('cancelTx').addEventListener('click', ()=> overlayTx.classList.remove('open'));
+overlayTx.addEventListener('click', e=>{ if(e.target===overlayTx) overlayTx.classList.remove('open'); });
+
+document.getElementById('saveTx').addEventListener('click', async ()=>{
+  const amount = Number(document.getElementById('fAmount').value);
+  if(!amount || amount<=0){ document.getElementById('errAmount').style.display='block'; return; }
+  document.getElementById('errAmount').style.display='none';
+  if(!txByClient[currentTxClientId]) txByClient[currentTxClientId] = [];
+  txByClient[currentTxClientId].push({
+    type: currentTxType,
+    amount,
+    date: todayStr(),
+    ts: Date.now()
+  });
+  overlayTx.classList.remove('open');
+  render();
+  await saveClientTx(currentTxClientId);
+});
+
+const overlayToday = document.getElementById('overlayToday');
+document.getElementById('openToday').addEventListener('click', ()=>{
+  const today = todayStr();
+  const nameOf = id => { const c = clients.find(x=>x.id===id); return c ? c.name : "Noma'lum"; };
+  const payments = [];
+  const purchases = [];
+  Object.keys(txByClient).forEach(id=>{
+    (txByClient[id]||[]).forEach(t=>{
+      if(t.date===today){
+        (t.type==='payment' ? payments : purchases).push({...t, clientId:id});
+      }
+    });
+  });
+  payments.sort((a,b)=>b.ts-a.ts);
+  purchases.sort((a,b)=>b.ts-a.ts);
+
+  let html = '';
+  if(payments.length===0 && purchases.length===0){
+    html = '<div class="today-empty">Bugun hali hech qanday tranzaksiya bo\'lmagan.</div>';
+  }else{
+    if(payments.length){
+      html += `<h3>Pul bergan mijozlar (${payments.length})</h3>`;
+      html += payments.map(t=>`<div class="today-row"><span>${esc(nameOf(t.clientId))}</span><span class="amt payment">${fmt(t.amount)}</span></div>`).join('');
+    }
+    if(purchases.length){
+      html += `<h3>Tovar olgan mijozlar (${purchases.length})</h3>`;
+      html += purchases.map(t=>`<div class="today-row"><span>${esc(nameOf(t.clientId))}</span><span class="amt purchase">${fmt(t.amount)}</span></div>`).join('');
+    }
+  }
+  document.getElementById('todayList').innerHTML = html;
+  overlayToday.classList.add('open');
+});
+document.getElementById('closeToday').addEventListener('click', ()=> overlayToday.classList.remove('open'));
+overlayToday.addEventListener('click', e=>{ if(e.target===overlayToday) overlayToday.classList.remove('open'); });
+
+loadData();
+</script>
+</body>
+</html>
